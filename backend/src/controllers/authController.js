@@ -31,17 +31,17 @@ exports.signup = async (req, res) => {
       password: hashedPassword
     });
 
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+    });
+
     // Welcome Email
     await transporter.sendMail({
       from: process.env.SENDER_EMAIL,
       to: email,
       subject: "Welcome to Doctor Appointment App",
       html: `<h2>Hello ${name}</h2><p>Your account has been created successfully.</p>`,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "User registered successfully",
     });
 
   } catch (error) {
@@ -173,6 +173,11 @@ exports.forgotPassword = async (req, res) => {
     user.resetOtpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
+    res.json({
+      success: true,
+      message: "OTP sent to email",
+    });
+
     await transporter.sendMail({
       from: process.env.SENDER_EMAIL,
       to: email,
@@ -180,10 +185,7 @@ exports.forgotPassword = async (req, res) => {
       html: `<p>Your OTP is <b>${otp}</b>. It is valid for 10 minutes.</p>`,
     });
 
-    res.json({
-      success: true,
-      message: "OTP sent to email",
-    });
+
   } catch (error) {
     res.status(500).json({
       success: false,

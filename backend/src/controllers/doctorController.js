@@ -30,9 +30,18 @@ exports.createDoctorProfile = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Doctor profile created",
+      message: "Doctor profile Created",
       doctor,
     });
+
+    // Welcome Email
+    await transporter.sendMail({
+      from: process.env.SENDER_EMAIL,
+      to: email,
+      subject: "Doctor profile Created",
+      html: `<h2>Hello ${existingDoctor.name}</h2><p>Your Doctor Profile has been created successfully.</p>`,
+    });
+    
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
