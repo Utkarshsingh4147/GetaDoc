@@ -20,7 +20,6 @@ const DoctorProfile = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [slots, setSlots] = useState([]);
-  const [newSlot, setNewSlot] = useState("");
   const [loading, setLoading] = useState(true);
 
   // Form state for creating a new profile
@@ -30,12 +29,13 @@ const DoctorProfile = () => {
     fees: ""
   });
 
+  // Generate an array representing hours 0 to 23
+  const hourOptions = Array.from({ length: 24 }, (_, i) => i);
+
   const fetchProfile = async () => {
     try {
       setLoading(true);
       const res = await api.get("/doctors");
-      
-      // 3. Find the profile that belongs to the logged-in user
       const doctorsList = res.data.doctors || [];
       const myDoctor = doctorsList.find(
         (doc) => doc.userId?._id === user?.userId || doc.userId === user?.userId
@@ -45,12 +45,11 @@ const DoctorProfile = () => {
         setProfile(myDoctor);
         setSlots(myDoctor.availableSlots || []);
       } else {
-        // Handle case where doctor profile isn't created yet
         setProfile(null);
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load your specific profile");
+      toast.error("Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -60,43 +59,63 @@ const DoctorProfile = () => {
     fetchProfile();
   }, []);
 
-const handleCreateProfile = async (e) => {
-  e.preventDefault();
+  const handleCreateProfile = async (e) => {
+    e.preventDefault();
     if (!user || !user.userId) {
-    toast.error("User session not found. Please log in again.");
-    return;
-  }
-
-  try {
-    const payload = {
-      userId: user.userId, 
-      specialization: formData.specialization,
-      experience: Number(formData.experience), 
-      fees: Number(formData.fees),             
-      availableSlots: []
-    };
-
-    const res = await api.post("/doctors/create", payload);
-
-    if (res.data.success) {
-      toast.success("Professional profile created!");
-      await fetchProfile(); 
-    }
-  } catch (error) {
-    const errorMsg = error.response?.data?.message || "Creation failed";
-    toast.error(errorMsg);
-    console.error("Profile Creation Error:", error.response?.data);
-  }
-};
-
-  const addSlot = () => {
-    if (!newSlot) return;
-    if (slots.includes(newSlot)) {
-      toast.warning("This slot already exists");
+      toast.error("User session not found.");
       return;
     }
-    setSlots([...slots, newSlot]);
-    setNewSlot("");
+
+    try {
+      const payload = {
+        userId: user.userId,
+        specialization: formData.specialization,
+        experience: Number(formData.experience),
+        fees: Number(formData.fees),
+        availableSlots: []
+      };
+
+      const res = await api.post("/doctors/create", payload);
+      if (res.data.success) {
+        toast.success("Professional profile created!");
+        await fetchProfile();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Creation failed");
+    }
+  };
+
+  // Logic to generate 3 slots of 20 mins for a specific hour
+  const generateSubSlots = (startHour) => {
+    const newSubSlots = [];
+    for (let i = 0; i < 60; i += 20) {
+      const startMinutes = i.toString().padStart(2, "0");
+      const endTotalMinutes = i + 20;
+      
+      let endHour = startHour;
+      let endMinutes = endTotalMinutes;
+
+      if (endTotalMinutes === 60) {
+        endHour = (startHour + 1) % 24;
+        endMinutes = 0;
+      }
+
+      const startTime = `${startHour.toString().padStart(2, "0")}:${startMinutes}`;
+      const endTime = `${endHour.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
+      
+      newSubSlots.push(`${startTime} - ${endTime}`);
+    }
+
+    // Filter out slots that already exist in the list
+    const filteredNew = newSubSlots.filter((s) => !slots.includes(s));
+
+    if (filteredNew.length === 0) {
+      toast.info(`Slots for ${startHour}:00 are already added`);
+      return;
+    }
+
+    setSlots([...slots, ...filteredNew]);
+    toast.success(`Added ${filteredNew.length} slots for ${startHour}:00`);
   };
 
   const removeSlot = (slotToRemove) => {
@@ -109,6 +128,7 @@ const handleCreateProfile = async (e) => {
       toast.success("Availability updated successfully");
     } catch (error) {
       toast.error("Failed to update availability");
+      console.error(error);
     }
   };
 
@@ -133,14 +153,12 @@ const handleCreateProfile = async (e) => {
         </div>
 
         {!profile ? (
-          /* --- CREATE PROFILE SECTION (Shown if no profile exists) --- */
           <div className="max-w-2xl mx-auto bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-slate-100">
             <div className="text-center mb-8">
               <div className="bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
                 <Sparkles size={32} />
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Setup Professional Profile</h2>
-              <p className="text-slate-500 text-sm">Fill in these details to appear in patient searches.</p>
             </div>
 
             <form onSubmit={handleCreateProfile} className="space-y-6">
@@ -150,7 +168,7 @@ const handleCreateProfile = async (e) => {
                   <Stethoscope className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     type="text"
-                    placeholder="e.g. Cardiologist, Dermatologist"
+                    placeholder="e.g. Cardiologist"
                     className="input input-bordered w-full pl-12 rounded-xl"
                     value={formData.specialization}
                     onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
@@ -166,7 +184,6 @@ const handleCreateProfile = async (e) => {
                     <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                       type="number"
-                      placeholder="e.g. 5"
                       className="input input-bordered w-full pl-12 rounded-xl"
                       value={formData.experience}
                       onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
@@ -180,7 +197,6 @@ const handleCreateProfile = async (e) => {
                     <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input
                       type="number"
-                      placeholder="e.g. 500"
                       className="input input-bordered w-full pl-12 rounded-xl"
                       value={formData.fees}
                       onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
@@ -196,9 +212,7 @@ const handleCreateProfile = async (e) => {
             </form>
           </div>
         ) : (
-          /* --- EXISTING PROFILE SECTION --- */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
             {/* LEFT: PROFILE SUMMARY */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
@@ -235,20 +249,32 @@ const handleCreateProfile = async (e) => {
                   <h2 className="text-xl font-bold text-slate-800">Manage Availability</h2>
                 </div>
 
+                {/* --- TIME SLOT SELECTOR GRID --- */}
                 <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-100">
-                  <label className="text-sm font-bold text-slate-700 mb-2 block">Add New Time Slot</label>
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      className="input input-bordered w-full rounded-xl"
-                      placeholder="e.g. 09:00 AM - 10:00 AM"
-                      value={newSlot}
-                      onChange={(e) => setNewSlot(e.target.value)}
-                    />
-                    <button className="btn btn-primary rounded-xl px-6 gap-2" onClick={addSlot}>
-                      <Plus size={18} /> Add
-                    </button>
+                  <label className="text-sm font-bold text-slate-700 mb-4 block">
+                    Select Hour to Add (24-Hour Format)
+                  </label>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {hourOptions.map((hour) => {
+                      const isAnySlotInHourAdded = slots.some(s => s.startsWith(`${hour.toString().padStart(2, '0')}:`));
+                      return (
+                        <button
+                          key={hour}
+                          onClick={() => generateSubSlots(hour)}
+                          className={`py-2 px-1 rounded-xl border text-xs font-bold transition-all ${
+                            isAnySlotInHourAdded 
+                            ? "bg-primary text-white border-primary shadow-md" 
+                            : "bg-white border-slate-200 text-slate-600 hover:border-primary hover:text-primary"
+                          }`}
+                        >
+                          {hour.toString().padStart(2, "0")}:00
+                        </button>
+                      );
+                    })}
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-4 italic">
+                    * Clicking an hour generates three 20-minute slots.
+                  </p>
                 </div>
 
                 <div className="space-y-3 mb-8">
@@ -259,8 +285,8 @@ const handleCreateProfile = async (e) => {
                     </p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {slots.map((slot, index) => (
-                        <div key={index} className="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-2xl">
+                      {slots.sort().map((slot, index) => (
+                        <div key={index} className="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-2xl hover:shadow-sm transition-shadow">
                           <span className="text-sm font-semibold text-slate-700">{slot}</span>
                           <button className="btn btn-ghost btn-xs text-slate-400 hover:text-error" onClick={() => removeSlot(slot)}>
                             <Trash2 size={16} />
