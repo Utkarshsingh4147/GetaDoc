@@ -66,7 +66,7 @@ exports.getMyAppointments = async (req, res) => {
     if (req.user.role === "doctor") {
       // FIX: Find the Doctor profile associated with the logged-in User ID
       const doctorProfile = await Doctor.findOne({ userId: req.user.userId });
-      
+
       if (!doctorProfile) {
         return res.status(404).json({
           success: false,
@@ -94,47 +94,6 @@ exports.getMyAppointments = async (req, res) => {
   }
 };
 
-// Update status (Fixed authorization)
-exports.updateAppointmentStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
-
-    if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid status",
-      });
-    }
-
-    const appointment = await Appointment.findById(req.params.id);
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
-    // Security check: Only the assigned doctor can update the status
-    const doctorProfile = await Doctor.findOne({ userId: req.user.userId });
-    if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to update this appointment",
-      });
-    }
-
-    appointment.status = status;
-    await appointment.save();
-
-    res.json({
-      success: true,
-      message: `Appointment ${status} successfully`,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 // Delete appointment (Fixed Doctor check)
 exports.deleteAppointment = async (req, res) => {
   try {
@@ -155,9 +114,9 @@ exports.deleteAppointment = async (req, res) => {
       const userIdFromToken = req.user.userId.toString();
 
       if (patientIdInDb !== userIdFromToken) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized: You do not own this appointment" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized: You do not own this appointment"
         });
       }
     }
@@ -165,7 +124,7 @@ exports.deleteAppointment = async (req, res) => {
     // --- DOCTOR AUTHORIZATION ---
     if (req.user.role === "doctor") {
       const doctorProfile = await Doctor.findOne({ userId: req.user.userId });
-      
+
       if (!doctorProfile) {
         return res.status(404).json({ success: false, message: "Doctor profile not found" });
       }
@@ -174,9 +133,9 @@ exports.deleteAppointment = async (req, res) => {
       const doctorProfileId = doctorProfile._id.toString();
 
       if (doctorIdInAppt !== doctorProfileId) {
-        return res.status(403).json({ 
-          success: false, 
-          message: "Not authorized: This appointment is not assigned to you" 
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized: This appointment is not assigned to you"
         });
       }
     }
@@ -186,6 +145,94 @@ exports.deleteAppointment = async (req, res) => {
     res.json({
       success: true,
       message: "Appointment deleted successfully",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Complete Appointment and Add Prescription
+exports.completeAppointment = async (req, res) => {
+  try {
+    const { appointmentId, prescriptionContent, medicines } = req.body;
+
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    if (appointment.status === "rejected") {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot complete a rejected appointment"
+      });
+    }
+
+    const doctorProfile = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to complete this appointment",
+      });
+    }
+
+    appointment.status = "completed";
+    appointment.visited = true;
+    appointment.prescription = {
+      content: prescriptionContent,
+      medicines: medicines,
+    };
+    appointment.prescribedAt = Date.now();
+
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: "Appointment marked as completed and prescription saved",
+      appointment,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Updated updateAppointmentStatus to allow 'completed'
+exports.updateAppointmentStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    // Allow 'completed' in the status check
+    if (!["approved", "rejected", "completed"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status",
+      });
+    }
+
+    const appointment = await Appointment.findById(req.params.id);
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
+    const doctorProfile = await Doctor.findOne({ userId: req.user.userId });
+    if (!doctorProfile || appointment.doctorId.toString() !== doctorProfile._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to update this appointment",
+      });
+    }
+
+    appointment.status = status;
+    // Automatically mark visited if status is set to completed here
+    if (status === "completed") {
+      appointment.visited = true;
+    }
+
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: `Appointment ${status} successfully`,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

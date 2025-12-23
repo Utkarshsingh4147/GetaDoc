@@ -7,18 +7,22 @@ import {
   Trash2, 
   Calendar, 
   Clock, 
-  User, 
   Filter, 
-  ArrowLeft 
+  ArrowLeft,
+  FileText,
+  CheckCircle,
+  Stethoscope
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
+import PrescriptionForm from "../../components/PrescriptionForm";
 
 const DoctorAppointments = () => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, approved, pending, rejected
+  const [filter, setFilter] = useState("all"); // all, approved, pending, rejected, completed
+  const [selectedAppt, setSelectedAppt] = useState(null);
   const navigate = useNavigate();
 
   const fetchAppointments = async () => {
@@ -58,6 +62,13 @@ const DoctorAppointments = () => {
     }
   };
 
+  const handlePrescriptionSuccess = () => {
+    document.getElementById("appt_prescription_modal").close();
+    setSelectedAppt(null);
+    toast.success("Prescription saved and visit completed");
+    fetchAppointments();
+  };
+
   const filteredAppointments = appointments.filter(appt => 
     filter === "all" ? true : appt.status === filter
   );
@@ -85,11 +96,11 @@ const DoctorAppointments = () => {
               <ArrowLeft size={16} /> Back to Dashboard
             </button>
             <h1 className="text-3xl font-extrabold text-slate-800">Appointment Ledger</h1>
-            <p className="text-slate-500">View and manage patient scheduling history</p>
+            <p className="text-slate-500">View and manage clinical visits and prescriptions</p>
           </div>
 
-          <div className="tabs tabs-boxed bg-white border border-slate-100 p-1 shadow-sm">
-            {["all", "pending", "approved", "rejected"].map((t) => (
+          <div className="tabs tabs-boxed bg-white border border-slate-100 p-1 shadow-sm overflow-x-auto">
+            {["all", "pending", "approved", "completed", "rejected"].map((t) => (
               <button
                 key={t}
                 onClick={() => setFilter(t)}
@@ -145,6 +156,7 @@ const DoctorAppointments = () => {
                       </td>
                       <td className="bg-slate-50/50 border-y border-slate-100">
                         <span className={`badge badge-sm font-bold border-none py-3 px-4 ${
+                          appt.status === "completed" ? "bg-blue-600 text-white shadow-sm shadow-blue-200" :
                           appt.status === "approved" ? "bg-emerald-100 text-emerald-700" :
                           appt.status === "rejected" ? "bg-rose-100 text-rose-700" :
                           "bg-amber-100 text-amber-700"
@@ -153,7 +165,8 @@ const DoctorAppointments = () => {
                         </span>
                       </td>
                       <td className="bg-slate-50/50 rounded-r-2xl border-y border-r border-slate-100 text-right">
-                        <div className="flex justify-end gap-2 pr-2">
+                        <div className="flex justify-end items-center gap-2 pr-2">
+                          {/* --- ACTION: PENDING --- */}
                           {appt.status === "pending" && (
                             <>
                               <button 
@@ -172,6 +185,27 @@ const DoctorAppointments = () => {
                               </button>
                             </>
                           )}
+
+                          {/* --- ACTION: APPROVED (Write Prescription) --- */}
+                          {appt.status === "approved" && (
+                            <button 
+                              onClick={() => {
+                                setSelectedAppt(appt);
+                                document.getElementById("appt_prescription_modal").showModal();
+                              }}
+                              className="btn btn-primary btn-sm gap-2 rounded-xl"
+                            >
+                              <FileText size={16} /> Prescribe
+                            </button>
+                          )}
+
+                          {/* --- ACTION: COMPLETED --- */}
+                          {appt.status === "completed" && (
+                             <div className="flex items-center gap-1 text-blue-600 font-bold text-xs pr-4">
+                                <CheckCircle size={14} /> VISITED
+                             </div>
+                          )}
+
                           <button 
                             onClick={() => deleteAppointment(appt._id)}
                             className="btn btn-sm btn-circle btn-ghost text-slate-400 hover:text-rose-600 hover:bg-rose-50"
@@ -189,6 +223,32 @@ const DoctorAppointments = () => {
           )}
         </div>
       </main>
+
+      {/* --- PRESCRIPTION MODAL --- */}
+      <dialog id="appt_prescription_modal" className="modal modal-bottom sm:modal-middle">
+        <div className="modal-box max-w-4xl p-0 bg-slate-50 overflow-hidden">
+          <div className="p-6 bg-white border-b flex justify-between items-center">
+            <h3 className="font-bold text-lg text-black flex items-center gap-2">
+              <Stethoscope className="text-primary" /> 
+              Consultation: {selectedAppt?.patientId?.name}
+            </h3>
+            <form method="dialog">
+              <button className="btn btn-sm btn-circle btn-ghost bg-red-500">✕</button>
+            </form>
+          </div>
+          <div className="p-8">
+            {selectedAppt && (
+              <PrescriptionForm 
+                appointmentId={selectedAppt._id} 
+                onSuccess={handlePrescriptionSuccess} 
+              />
+            )}
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
       <Footer />
     </div>

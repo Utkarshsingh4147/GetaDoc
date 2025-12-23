@@ -4,44 +4,29 @@ import { toast } from "react-toastify";
 import { 
   Calendar, 
   Clock, 
-  User, 
-  MapPin, 
-  XCircle, 
-  CheckCircle, 
-  AlertCircle,
-  Filter,
-  ArrowLeft
+  FileText, 
+  Search, 
+  Pill, 
+  ClipboardList, 
+  Printer,
+  Stethoscope
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 
 const MyAppointments = () => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, approved, pending, rejected
-  const navigate = useNavigate();
+  const [selectedAppt, setSelectedAppt] = useState(null);
 
   const fetchAppointments = async () => {
     try {
-      setLoading(true);
       const res = await api.get("/appointments/my-appointments");
       setAppointments(res.data.appointments || []);
     } catch (error) {
-      toast.error("Could not load your appointments");
+      toast.error("Failed to load your appointments");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCancel = async (id) => {
-    if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
-    try {
-      await api.delete(`/appointments/${id}`);
-      toast.success("Appointment cancelled successfully");
-      fetchAppointments(); // Refresh list
-    } catch (error) {
-      toast.error("Failed to cancel appointment");
     }
   };
 
@@ -49,145 +34,170 @@ const MyAppointments = () => {
     fetchAppointments();
   }, []);
 
-  const filteredAppointments = appointments.filter(appt => 
-    filter === "all" ? true : appt.status === filter
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-slate-50">
+        <span className="loading loading-spinner loading-lg text-primary"></span>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        {/* --- HEADER --- */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <button 
-              onClick={() => navigate('/dashboard/patient')}
-              className="flex items-center gap-2 text-slate-500 hover:text-primary transition-colors mb-2 text-sm font-medium"
-            >
-              <ArrowLeft size={16} /> Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-extrabold text-slate-800">My Appointments</h1>
-            <p className="text-slate-500">Track and manage your medical consultations</p>
-          </div>
-
-          {/* --- TAB FILTERS --- */}
-          <div className="tabs tabs-boxed bg-white p-1 border border-slate-100 shadow-sm">
-            {["all", "pending", "approved", "rejected"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                className={`tab tab-sm md:tab-md capitalize ${filter === tab ? "tab-active bg-primary text-white" : "text-slate-500"}`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+      <main className="max-w-6xl mx-auto p-6 lg:p-10">
+        <div className="mb-10">
+          <h1 className="text-3xl font-extrabold text-slate-800">My Appointments</h1>
+          <p className="text-slate-500">Track your bookings and view medical prescriptions</p>
         </div>
 
-        {/* --- APPOINTMENT LIST --- */}
-        {loading ? (
-          <div className="flex flex-col justify-center items-center py-20">
-            <span className="loading loading-spinner loading-lg text-primary"></span>
-            <p className="mt-4 text-slate-400 font-medium tracking-wide">Syncing your schedule...</p>
-          </div>
-        ) : filteredAppointments.length === 0 ? (
-          <div className="bg-white rounded-3xl p-16 text-center border border-slate-100 shadow-sm">
-            <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 text-slate-300">
-              <Calendar size={40} />
+        <div className="grid gap-6">
+          {appointments.length === 0 ? (
+            <div className="bg-white rounded-3xl p-20 text-center border border-slate-100">
+              <Calendar size={48} className="mx-auto text-slate-200 mb-4" />
+              <p className="text-slate-500 font-medium">No appointments found.</p>
             </div>
-            <h3 className="text-xl font-bold text-slate-800">No appointments found</h3>
-            <p className="text-slate-500 mt-2 mb-8">You don't have any {filter !== 'all' ? filter : ''} appointments scheduled.</p>
-            <button 
-              className="btn btn-primary px-8 rounded-xl"
-              onClick={() => navigate('/dashboard/patient')}
-            >
-              Book a New Appointment
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-6">
-            {filteredAppointments.map((appt) => (
+          ) : (
+            appointments.map((appt) => (
               <div 
                 key={appt._id} 
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all overflow-hidden"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md transition-shadow"
               >
-                <div className="flex flex-col md:flex-row">
-                  {/* Status Bar (Side) */}
-                  <div className={`w-2 md:w-3 ${
-                    appt.status === 'approved' ? 'bg-emerald-500' : 
-                    appt.status === 'rejected' ? 'bg-rose-500' : 'bg-amber-400'
-                  }`} />
-
-                  <div className="flex-1 p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                    {/* Doctor Info */}
-                    <div className="flex items-center gap-5 w-full md:w-auto">
-                      <div className="avatar placeholder">
-                        <div className="bg-slate-100 text-slate-600 rounded-2xl w-16">
-                          <User size={32} />
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-bold text-slate-800">Dr. {appt.doctorId?.userId?.name}</h4>
-                        <p className="text-sm text-primary font-medium">{appt.doctorId?.specialization}</p>
-                        <div className="flex items-center gap-1 mt-1 text-slate-400 text-xs">
-                          <MapPin size={12} /> Medical Center, Main Wing
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Date & Time */}
-                    <div className="flex flex-row md:flex-col gap-8 md:gap-1 w-full md:w-auto border-y md:border-none py-4 md:py-0 border-slate-50">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Calendar size={18} className="text-slate-400" />
-                        <span className="font-semibold">{appt.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Clock size={18} className="text-slate-400" />
-                        <span className="font-medium text-sm">{appt.time}</span>
-                      </div>
-                    </div>
-
-                    {/* Status & Actions */}
-                    <div className="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto">
-                      <div className="text-right hidden md:block mr-4">
-                        <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border ${
-                          appt.status === 'approved' ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 
-                          appt.status === 'rejected' ? 'bg-rose-50 border-rose-200 text-rose-600' : 
-                          'bg-amber-50 border-amber-200 text-amber-600'
-                        }`}>
-                          {appt.status}
-                        </span>
-                      </div>
-
-                      <div className="flex gap-2 w-full md:w-auto">
-                        {appt.status === 'pending' && (
-                          <button 
-                            onClick={() => handleCancel(appt._id)}
-                            className="btn btn-outline btn-error btn-sm flex-1 md:flex-none gap-2 rounded-lg"
-                          >
-                            <XCircle size={16} /> Cancel
-                          </button>
-                        )}
-                        <button className="btn btn-ghost btn-sm bg-slate-50 text-slate-600 flex-1 md:flex-none rounded-lg">
-                           Details
-                        </button>
-                      </div>
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Stethoscope size={28} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-slate-800">
+                      Dr. {appt.doctorId?.userId?.name || "Doctor"}
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-2">{appt.doctorId?.specialization}</p>
+                    <div className="flex flex-wrap gap-3">
+                      <span className="flex items-center gap-1 text-xs font-medium bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 text-slate-600">
+                        <Calendar size={12} /> {appt.date}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs font-medium bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 text-slate-600">
+                        <Clock size={12} /> {appt.time}
+                      </span>
                     </div>
                   </div>
                 </div>
-                
-                {/* Footer Message */}
-                {appt.status === 'approved' && (
-                  <div className="bg-emerald-50 px-6 py-2 flex items-center gap-2 text-emerald-700 text-xs font-medium">
-                    <CheckCircle size={14} /> Please arrive 15 minutes before your scheduled time.
-                  </div>
-                )}
+
+                <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-none pt-4 md:pt-0">
+                  <span className={`badge badge-md font-bold px-4 py-3 border-none ${
+                    appt.status === "completed" ? "bg-blue-100 text-blue-700" :
+                    appt.status === "approved" ? "bg-emerald-100 text-emerald-700" :
+                    appt.status === "rejected" ? "bg-rose-100 text-rose-700" : 
+                    "bg-amber-100 text-amber-700"
+                  }`}>
+                    {appt.status}
+                  </span>
+
+                  {appt.status === "completed" && (
+                    <button 
+                      onClick={() => {
+                        setSelectedAppt(appt);
+                        document.getElementById("view_prescription_modal").showModal();
+                      }}
+                      className="btn btn-primary btn-sm gap-2 rounded-xl"
+                    >
+                      <FileText size={16} /> View Prescription
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+            ))
+          )}
+        </div>
+      </main>
+
+      {/* --- PRESCRIPTION MODAL --- */}
+      <dialog id="view_prescription_modal" className="modal modal-bottom sm:modal-middle">
+        <div className="modal-box max-w-3xl p-0 bg-white overflow-x-scroll">
+          {/* Header */}
+          <div className="p-6 bg-slate-50 border-b flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary rounded-lg text-white">
+                <FileText size={20} />
+              </div>
+              <h3 className="font-bold text-xl text-black">Medical Prescription</h3>
+            </div>
+            <form method="dialog">
+              <button className="btn btn-sm btn-circle btn-ghost bg-red-500">✕</button>
+            </form>
           </div>
-        )}
-      </div>
+
+          {/* Content */}
+          <div className="p-8 space-y-8" id="printable-prescription">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-sm text-slate-500 uppercase tracking-wider font-semibold">Doctor Details</p>
+                <h4 className="text-lg font-medium text-gray-500">Dr. {selectedAppt?.doctorId?.userId?.name}</h4>
+                <p className="text-sm text-slate-600">{selectedAppt?.doctorId?.specialization}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-500 uppercase tracking-wider font-semibold">Date</p>
+                <p className="font-medium text-gray-500">{selectedAppt?.date}</p>
+              </div>
+            </div>
+
+            <div className="divider"></div>
+
+            {/* Diagnosis */}
+            <div>
+              <h5 className="flex items-center gap-2 font-bold text-slate-800 mb-3">
+                <ClipboardList size={18} className="text-primary" /> Diagnosis & Clinical Notes
+              </h5>
+              <p className="text-slate-700 bg-slate-50 p-5 rounded-2xl italic leading-relaxed">
+                {selectedAppt?.prescription?.content || "No specific notes provided."}
+              </p>
+            </div>
+
+            {/* Medicines */}
+            <div>
+              <h5 className="flex items-center gap-2 font-bold text-slate-800 mb-4">
+                <Pill size={18} className="text-primary" /> Prescribed Medication
+              </h5>
+              <div className="overflow-x-auto border rounded-2xl border-slate-100">
+                <table className="table w-full">
+                  <thead className="bg-slate-50">
+                    <tr className="text-slate-600">
+                      <th>Medicine</th>
+                      <th>Dosage</th>
+                      <th>Frequency</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedAppt?.prescription?.medicines?.map((med, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="font-bold text-primary">{med.name}</td>
+                        <td>{med.dosage}</td>
+                        <td><span className="badge badge-ghost font-medium">{med.frequency}</span></td>
+                        <td>{med.duration}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Footer */}
+          <div className="p-6 bg-slate-50 border-t flex justify-end">
+            <button 
+              className="btn btn-outline btn-primary gap-2"
+              onClick={() => window.print()}
+            >
+              <Printer size={18} /> Print Records
+            </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
       <Footer />
     </div>
